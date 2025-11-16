@@ -1,53 +1,115 @@
 ---
 title: "Simulation"
-author: "Your Name Here"
+author: "Kaitlyn Steck"
 format: html
 ---
-
 
 # Warming Up
 
 Most statistical software packages have several built-in distributions to handle the most common situations statisticians come across when simulating values.
 
-Remember to set your seeds for these exercises so that you get the same answer each time the code is evaluated. 
+Remember to set your seeds for these exercises so that you get the same answer each time the code is evaluated.
 
 ## Exponential Distribution
 
-1. Simulate 1000 draws from the exponential distribution $$f(x) = \lambda e^{-\lambda x},\;\;\;\; x\geq0, \text{ with } \lambda=3$$
+1.  Simulate 1000 draws from the exponential distribution $$f(x) = \lambda e^{-\lambda x},\;\;\;\; x\geq0, \text{ with } \lambda=3$$
 
+2.  Create a density plot of your values. Add the PDF of the exponential(3) distribution to your plot in a different color. How do they compare?
 
-2. Create a density plot of your values. Add the PDF of the exponential(3) distribution to your plot in a different color. How do they compare?
+3.  How might you use your 1000 draws to estimate the probability that $x > 1$? Provide an estimate using only your 1000 draws, and compare this estimate to one derived from `pexp` (R) or `scipy.stats.expon.cdf` (Python).
 
-3. How might  you use your 1000 draws to estimate the probability that $x > 1$? Provide an estimate using only your 1000 draws, and compare this estimate to one derived from `pexp` (R) or `scipy.stats.expon.cdf` (Python).
+4.  What is the average error from using a $n=1000$ simulation instead of a numerical calculation for the probability that $x>1$? Write a function to calculate the error from one simulation, and evaluate that function 100 times to calculate the expected error from using a simulation estimate rather than deterministic numerical integration.
 
-4. What is the average error from using a $n=1000$ simulation instead of a numerical calculation for the probability that $x>1$? Write a function to calculate the error from one simulation, and evaluate that function 100 times to calculate the expected error from using a simulation estimate rather than deterministic numerical integration.
+```{r}
+library(tidyverse) 
+library(dplyr)
+library(ggplot2)
 
+set.seed(40678329)
+## simulate draws
+exp_draws <- tibble(
+   x = rexp(1000, rate = 3)
+)
+##plot of my values and PDF
+densityplot<- ggplot(exp_draws, aes(x = x)) +
+    geom_density()+
+    geom_function(fun=dexp, color="red", args=list(rate=3))
+print(densityplot)
 
+## prob x>1
+prob_greater <- exp_draws %>% 
+    summarize(
+        n = n(),
+        total = sum(x>1), 
+        prob = total/ n()
+    )
 
+1- pexp(1, rate = 3)
+
+##average error
+
+sim_error <- function(n=1000, rate = 3, i = 1) {
+       x = rexp(1000, rate = 3)
+       prob = mean(x>1)
+       (1- pexp(1, rate = 3)) - prob
+}
+set.seed(40678329)
+map_dbl(1:100, ~sim_error(i = .)) %>% mean()
+```
 
 ## Gamma Distribution
 
-The Gamma distribution is an exponential family, so it has MLEs that are unbiased and efficient estimators, if somewhat challenging to calculate in closed form. 
+The Gamma distribution is an exponential family, so it has MLEs that are unbiased and efficient estimators, if somewhat challenging to calculate in closed form.
 
 Luckily, there are functions in R and python to handle this:
 
-- `fitdistr(...)` in the `MASS` package (R) will estimate the  parameters for a gamma distribution from sample data.
+-   `fitdistr(...)` in the `MASS` package (R) will estimate the parameters for a gamma distribution from sample data.
 
-- `scipy.stats` distribution functions have a `.fit(data)` method that will estimate distributional parameters
+-   `scipy.stats` distribution functions have a `.fit(data)` method that will estimate distributional parameters
 
-In this problem, you will work with the gamma distribution with parameters $\alpha, \beta$ (note that R uses a different parameterization than Python) and PDF 
+In this problem, you will work with the gamma distribution with parameters $\alpha, \beta$ (note that R uses a different parameterization than Python) and PDF
 
 $$f(x | \alpha, \beta) = \frac{\beta^\alpha x^{\alpha-1} e^{-x}}{\Gamma(\alpha)}.$$
 
-1. Write a function that will calculate the MLE $\hat\alpha,\hat\beta$ from a vector $x_{samp}$ of gamma-distributed samples. Your function should have required parameter $x$ and optional parameters $\alpha,\beta$ representing the true values. The function should return a list of $\hat\alpha, \hat\beta$ and, if $\alpha,\beta$ are provided, it should also return $\alpha_{err} = \alpha-\hat\alpha$ and $\beta_{err} = \beta-\hat\beta$. 
+1.  Write a function that will calculate the MLE $\hat\alpha,\hat\beta$ from a vector $x_{samp}$ of gamma-distributed samples. Your function should have required parameter $x$ and optional parameters $\alpha,\beta$ representing the true values. The function should return a list of $\hat\alpha, \hat\beta$ and, if $\alpha,\beta$ are provided, it should also return $\alpha_{err} = \alpha-\hat\alpha$ and $\beta_{err} = \beta-\hat\beta$.
+
+```{r}
+
+library(MASS)
 
 
+mle_gamma <- function(x, a = NULL, b = NULL){
+    fit <- fitdistr(x, dgamma, start = list (shape =1, rate= 1))
+    alpha_hat <- fit$estimate["shape"]
+    rate_hat <- fit$estimate["rate"]
+    beta_hat <- 1 / rate_hat
+    
+    out <- list(
+        alpha_hat = alpha_hat,
+        beta_hat = beta_hat
+    )
+    
+    if (!is.null(a) && !is.null(b)){
+        out$alpha_err <- a - alpha_hat
+        out$beta_err <- b - beta_hat
+    }
+    return(out)
+}
 
 
-2. For a grid of $\alpha \times \beta=\{0.25, 0.50, 1.00, 2.00, 4.00\}\times\{0.25, 0.50, 1.00, 2.00, 4.00\}$, sample 100 values from the $\text{gamma}(\alpha,\beta)$ distribution. Provide the true parameter values and plot your error values in an appropriate plot. Take care to choose your plot mappings to support your discussion of the following: What trends (if any) do you notice in the estimation error?
+set.seed(14783492)
+x <- rgamma(1000, shape = 2, scale=3)
+mle_gamma(x, a = 3, b = 2)
 
 
-3. Now, let's vary the sample size. For $n=\{20, 30, 50, 100\}$, use your function to evaluate the error for $\alpha=1, \beta=2$. How does the error change as $n$ increases? Provide an appropriate plot as well as a description of the changes for increasing $n$. 
+```
 
+I used chatgpt for some of the code. I am not certain this is correct, but it is the closest I think I could get.I included the prompt I gave Chatgpt and some of it did not feel correct so I made some changes which are reflected in my code. 
 
+![ChatGPToutput.png](ChatGPToutput.png)
 
+![ChatGPToutput2.png](ChatGPToutput2.png)
+
+2.  For a grid of $\alpha \times \beta=\{0.25, 0.50, 1.00, 2.00, 4.00\}\times\{0.25, 0.50, 1.00, 2.00, 4.00\}$, sample 100 values from the $\text{gamma}(\alpha,\beta)$ distribution. Provide the true parameter values and plot your error values in an appropriate plot. Take care to choose your plot mappings to support your discussion of the following: What trends (if any) do you notice in the estimation error?
+
+3.  Now, let's vary the sample size. For $n=\{20, 30, 50, 100\}$, use your function to evaluate the error for $\alpha=1, \beta=2$. How does the error change as $n$ increases? Provide an appropriate plot as well as a description of the changes for increasing $n$.
